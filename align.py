@@ -70,7 +70,6 @@ def main(args: Args):
                     
                     sents.append(fix_sent_text)
         kaisetu_texts[filenum] = sents
-        print(kaisetu_texts)
 
         return {'haifuDatas': haifuDatas, 'kaisetu_texts': kaisetu_texts}
     
@@ -223,7 +222,7 @@ def main(args: Args):
             haifuData = haifuDatas[filenum]
             kaisetuText = kaisetuTexts[filenum]
             haifuInfo = {}
-            print('【{}】'.format(filenum))
+            print('【 {} 】'.format(filenum))
 
             linkList = Link(haifuData, kaisetuText, haifuInfo)
             SaveResult(filenum, kaisetuText, linkList)
