@@ -23,12 +23,16 @@ import MahjongTool
 class Args:
     detail:bool = False
     device:str = "cuda:0"
+    commentary_dir:str = "LinkedText"
+    haifu_dir:str = "haifuData"
+    save_output_dir:str = "train_{}"
     script_fix_file:str = ""
     neg_per_pos:int = 15
     batch_size:int = 8
     max_epoch:int = 5
     lr:float = 1e-5
     output_id:str = ""
+    save_all_epoch_model:bool = True
     debug:bool = False
 
 def main(args: Args):
@@ -36,9 +40,13 @@ def main(args: Args):
     
     detail = args.detail
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    commentary_dir = args.commentary_dir
+    haifu_dir = args.haifu_dir
     use_script_fix_file = False
     if args.script_fix_file != "":
         use_script_fix_file = True
+    save_all_epoch_model = args.save_all_epoch_model
+    save_output_dir = args.save_output_dir
     debug = args.debug
     
     INC_PER = args.neg_per_pos
@@ -50,13 +58,14 @@ def main(args: Args):
     if args.output_id != "":
             DAY = args.output_id
     
+    
     filenums4train = ["example_train"]
     filenums4test = ["example_dev"]
     filenums = filenums4train + filenums4test 
     print(filenums)
     
-    gold_link_filenames = ["LinkedText/" + filenum + "_linkedtext.csv" for filenum in filenums]
-    haifu_filenames = ["haifuData/" + filenum + ".json" for filenum in filenums]
+    gold_link_filenames = [commentary_dir + '/' + filenum + "_linkedtext.csv" for filenum in filenums]
+    haifu_filenames = [haifu_dir  + '/' + filenum + ".json" for filenum in filenums]
     sents = {}
     haifus = {}
     
@@ -92,7 +101,7 @@ def main(args: Args):
         return new_texts
     
     for filenum in filenums:
-        g_filename = "LinkedText/" + filenum + "_linkedtext.csv"
+        g_filename = commentary_dir + '/' + filenum + "_linkedtext.csv"
         sentdic_list = []
         
         with open(g_filename, 'r', encoding='utf-8') as fg:
@@ -114,7 +123,7 @@ def main(args: Args):
     for filenum in filenums:
         haifu_datas = []
         haifu_index = []
-        h_filename = "haifuData/" + filenum + ".json"
+        h_filename = haifu_dir  + "/" + filenum + ".json"
         with open(h_filename, 'r', encoding='utf-8') as hg:
             for _raw in hg:
                 js = _raw.rstrip()
@@ -222,7 +231,6 @@ def main(args: Args):
     t_sent_haifu_label4test = []
     for filenum in filenums4test:
         for sent in sents[filenum]:
-            # ややこしいので一旦対応付かないケースは除く
             if sent['haifu_num'] != '-':
                 h_num = int(sent['haifu_num'])
                 bit = {'sent' : sent['sent'], 'haifu' : haifus[filenum][h_num], 'label' : 1}
@@ -398,7 +406,7 @@ def main(args: Args):
 
         df = pd.DataFrame([data], columns=["size", "TP", "TN", "FP", "FN", "True", "False", "acc"], index=["epoch"])
 
-        print("-------- Validation ----------")
+        print("-----------------------------------")
         print(" {} / {} ".format(data[5], data[0]))
         print("val accuracy :       {}".format(data[5]/data[0]))
         print("val loss :       {}".format(val_loss))
@@ -424,10 +432,13 @@ def main(args: Args):
     df = pd.DataFrame(0, columns=["size", "TP", "TN", "FP", "FN", "True", "False", "acc"], index=["epoch"])
     df[['size', 'TP', 'TN', 'FP', 'FN', 'True', 'False']] = df[['size', 'TP', 'TN', 'FP', 'FN', 'True', 'False']].astype('int')
     
-    for epoch in range(max_epoch):
+    if not os.path.exists(save_output_dir.format(DAY)):
+        os.mkdir(save_output_dir.format(DAY))
+    
+    for epoch in range(1, max_epoch + 1):
         model.train()
         train_ = train_model(model)
-        print("++++++++++ epoch {} ++++++++++".format(epoch))
+        print("++++++++++++++++++++ epoch {} ++++++++++++++++++++".format(epoch))
         print("training loss : \t\t {}".format(train_))
 
         # validation
@@ -436,16 +447,17 @@ def main(args: Args):
         df[['size', 'TP', 'TN', 'FP', 'FN', 'True', 'False']] = df[['size', 'TP', 'TN', 'FP', 'FN', 'True', 'False']].astype('int')
         train_loss_.append(train_)
         
-        model_path_per_epoch = DAY + '.pth'
-        torch.save(model.state_dict(), model_path_per_epoch)
+        model_path_per_epoch = save_output_dir.format(DAY) + '/' + DAY + '_{}ep.pth'.format(epoch)
+        if save_all_epoch_model:
+            torch.save(model.state_dict(), model_path_per_epoch)
+            print("save model > {}".format(model_path_per_epoch))
 
         print("\n")
     
-    df.to_csv('{}.csv'.format(DAY))
+    df.to_csv(save_output_dir.format(DAY) + '/' + 'output_{}.csv'.format(DAY))
 
 
 if __name__ == "__main__":
     args = Args.from_args()
     main(args)
-
 
